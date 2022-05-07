@@ -64,10 +64,7 @@ app.post("/", async (req,res)=>{
         const user = await db.collection("users").findOne({email});
         if(user && bcrypt.compareSync(password, user.password)){
             const token = uuid();
-            await db.collection("sessions").insertOne({
-                userId:user._id,
-                token
-            })
+            await db.collection("sessions").insertOne({userId:user._id, token})
             res.send(token).status(200);
         }else{
             res.sendStatus(401);
@@ -79,7 +76,7 @@ app.post("/", async (req,res)=>{
 })
 
 app.get("/home", async (req,res)=>{
-    const {authorization} = req.header;
+    const {authorization} = req.headers;
     const token = authorization?.replace('Bearer ','');
     if(!token) return res.sendStatus(401);
     try{        
@@ -88,8 +85,9 @@ app.get("/home", async (req,res)=>{
 
         const user = await db.collection("users").findOne({_id: session.userId })
         if(user){
-            const userBalance = await db.collection("balance").find({id: user._id}).toArray();
-            if(!balance) return res.sendStatus(401) 
+            const userBalance = await db.collection("balance").find({userId: user._id}).toArray();
+            if(!userBalance) return res.sendStatus(401) 
+            console.log(userBalance)
             res.send(userBalance).status(200)
         }else{
             res.sendStatus(404)
@@ -103,45 +101,46 @@ app.get("/home", async (req,res)=>{
 
 app.post("/home", async (req,res)=>{
     const balance = req.body; // amount, description, type
-
+    
     const schema = joi.object({
         amount: joi.number().required(),
         description:joi.string().required(),
         type: joi.valid("income", "outcome").required()
     })
-
+    
     const {error} = schema.validate(balance,{abortEarly:false});
     if(error) return res.sendStatus(422);
-
-    const {authorization} = req.header;
+    
+    const {authorization} = req.headers;
     const token = authorization?.replace('Bearer ','');
     if(!token) return res.sendStatus(401);
 
     try{
         const session = await db.collection("sessions").findOne({token})
         if(!session) return res.sendStatus(401)
-        await db.collection("balance").insertOne({...balance, userId:session.userId, date: dayjs().format(DD/MM), id: new ObjectId()})
+        await db.collection("balance").insertOne({...balance, userId:session.userId, date: dayjs().format("DD/MM")})
+        res.sendStatus(201);
     }catch(e){
         console.error(e);
         res.sendStatus(500)
     } 
 })
 
-app.delete("/home:id", async (req,res)=>{
-    const {authorization} = req.header;
+app.delete("/home/:id", async (req,res)=>{
+    const {authorization} = req.headers;
     const token = authorization?.replace('Bearer ','');
     if(!token) return res.sendStatus(401);
 
     const {id} = req.params // id transação
-
+    
     try{
-        const balance = await db.collection("balance").findOne({id: new ObjectId(id)});
+        const balance = await db.collection("balance").findOne({_id: new ObjectId(id)});
         if(!balance) return res.sendStatus(404);
 
-        const checkUser = await db.collection("user").findOne({id:balance.userId});
-        if(!checkUser) return res.sendStatus(401);
+        const checkUser = await db.collection("users").findOne({_id:new ObjectId(balance.userId)});        
+        if(!checkUser) return res.sendStatus(401);   
 
-        await db.collection("balance").deleteOne({id: new ObjectId(id)});
+        await db.collection("balance").deleteOne({_id: new ObjectId(id)});
         res.sendStatus(200)      
     }catch(e){
         console.error(e)
@@ -150,8 +149,8 @@ app.delete("/home:id", async (req,res)=>{
 
 })
 
-app.put("/home:id", async (req,res)=>{
-    const {authorization} = req.header;
+app.put("/home/:id", async (req,res)=>{
+    const {authorization} = req.headers;
     const token = authorization?.replace('Bearer ','');
     if(!token) return res.sendStatus(401);
 
@@ -159,13 +158,13 @@ app.put("/home:id", async (req,res)=>{
     const {amount, description} = req.body;
 
     try{
-        const balance = await db.collection("balance").findOne({id: new ObjectId(id)});
+        const balance = await db.collection("balance").findOne({_id: new ObjectId(id)});
         if(!balance) return res.sendStatus(404);
 
-        const checkUser = await db.collection("user").findOne({id:balance.userId});
+        const checkUser = await db.collection("users").findOne({_id:new ObjectId(balance.userId)});
         if(!checkUser) return res.sendStatus(401);
 
-        await db.collection("balance").updateOne({id: new ObjectId(id)}, {$set:{amount, description}});
+        await db.collection("balance").updateOne({_id: new ObjectId(id)}, {$set:{amount, description}});
         res.sendStatus(200)      
     }catch(e){
         console.error(e)
@@ -175,7 +174,6 @@ app.put("/home:id", async (req,res)=>{
 })
 
 app.put("/home", async (req,res)=>{
-
     const {authorization} = req.header;
     const token = authorization?.replace('Bearer ','');
     if(!token) return res.sendStatus(401);
