@@ -20,7 +20,7 @@ app.use(homeRouter);
 
 
 
-const PORT = process.env.PORTA || 5000;
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, ()=>{
     console.log(chalk.green.bold(`Server is running on port http://localhost:${PORT}` ))
