@@ -12,7 +12,7 @@ export async function signUp(req,res){
     const schema = joi.object({
         name: joi.string().required(),
         email: joi.string().email(),
-        password:joi.string().alphanum().min(6).max(8).required(),
+        password:joi.alphanum().min(6).max(8).required(),
         confirmation:joi.ref("password")
     })
 
